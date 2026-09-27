@@ -89,7 +89,7 @@
     Object.keys(base.moments).forEach(id => {
       const m = s.moments && s.moments[id];
       if (m) Object.assign(base.moments[id], {
-        songs: Array.isArray(m.songs) ? m.songs.filter(Boolean) : [],
+        songs: Array.isArray(m.songs) ? m.songs.filter((x, i, arr) => x && arr.findIndex(y => y && songKey(y) === songKey(x)) === i) : [],
         chosen: m.chosen || null, note: m.note || '', hidden: !!m.hidden,
       });
     });
@@ -120,6 +120,26 @@
   }
 
   const uid = () => Math.random().toString(36).slice(2, 10);
+  const norm = t => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+  // Identidad de una canción: el track de Spotify, o el texto si es una canción sin link
+  const songKey = s => s.sid ? `sp:${s.sid}` : `t:${norm(s.title)}`;
+  // Misma canción publicada con distinto ID (single, álbum, recopilación…)
+  const nameKey = s => (s.artist && s.title && s.title !== 'Cargando…') ? `n:${norm(s.title)}|${norm(s.artist)}` : null;
+
+  // Quita del banco canciones repetidas (mismo link, mismo texto, o mismo nombre y artista)
+  function dedupeBank() {
+    const seen = new Set();
+    const before = state.bank.length;
+    state.bank = state.bank.filter(s => {
+      const keys = [songKey(s), nameKey(s)].filter(Boolean);
+      if (keys.some(k => seen.has(k))) return false;
+      keys.forEach(k => seen.add(k));
+      return true;
+    });
+    return before - state.bank.length;
+  }
+  const inBank = s => { const k = songKey(s), n = nameKey(s); return state.bank.some(b => songKey(b) === k || (n && nameKey(b) === n)); };
+  const inMoment = (id, s, exceptUid) => state.moments[id].songs.some(x => x.uid !== exceptUid && songKey(x) === songKey(s));
   const copySong = s => ({ ...s, uid: uid() });
 
   function findSong(u) {
@@ -157,25 +177,28 @@
     for (const part of parts) {
       const sp = parseSpotify(part);
       if (!sp) { // texto libre (coro en vivo, etc.)
-        state.bank.push({ uid: uid(), sid: null, title: part, artist: 'Coro / en vivo', thumb: '' });
+        const song = { uid: uid(), sid: null, title: part, artist: 'Coro / en vivo', thumb: '' };
+        if (inBank(song)) { dupes++; continue; }
+        state.bank.push(song);
         continue;
       }
       if (sp.type === 'track') {
-        if (state.bank.some(s => s.sid === sp.id)) { dupes++; continue; }
+        if (inBank({ sid: sp.id })) { dupes++; continue; }
         const song = { uid: uid(), sid: sp.id, title: 'Cargando…', artist: '', thumb: '' };
         state.bank.push(song);
         fresh.push(song);
       } else if (spotifyAuth.hasSession()) {
         const tracks = await spotifyAuth.listTracks(sp.type, sp.id);
         let n = 0;
-        tracks.forEach(t => { if (!state.bank.some(s => s.sid === t.sid)) { state.bank.push(t); n++; } });
+        tracks.forEach(t => { if (!inBank(t)) { state.bank.push(t); n++; } else dupes++; });
         toast(`Importadas ${n} canciones`);
       } else {
         $('#playlist-help').hidden = false;
       }
     }
-    if (fresh.length > 1) toast(`${fresh.length} canciones agregadas`);
-    else if (dupes && !fresh.length) toast(dupes > 1 ? 'Esas canciones ya están en el banco' : 'Esa canción ya está en el banco');
+    const skipped = dupes ? ` · ${dupes} ya ${dupes > 1 ? 'estaban' : 'estaba'} en el banco (no se repiten)` : '';
+    if (fresh.length > 1 || (fresh.length && dupes)) toast(`${fresh.length} ${fresh.length > 1 ? 'canciones agregadas' : 'canción agregada'}${skipped}`);
+    else if (dupes && !fresh.length) toast(dupes > 1 ? `Esas ${dupes} canciones ya están en el banco` : 'Esa canción ya está en el banco');
     save(); render();
     if (fresh.length) fillMetadata(fresh);
   }
@@ -191,6 +214,9 @@
       if (o) Object.assign(s, { title: o.title, thumb: o.thumb });
       else if (s.title === 'Cargando…') s.title = 'Canción de Spotify';
     }));
+    // con el nombre y artista ya cargados se detectan repetidas con otro link
+    const removed = dedupeBank();
+    if (removed) toast(`${removed} ${removed > 1 ? 'canciones repetidas quitadas' : 'canción repetida quitada'} del banco`);
     save(); render();
   }
 
@@ -312,6 +338,7 @@
   function syncFromDOM() {
     // Reconstruye el estado desde el orden del DOM. Lo que llega desde el banco se copia.
     const lookup = {};
+    let rejected = false;
     state.bank.forEach(s => lookup[s.uid] = { song: s, bank: true });
     Object.values(state.moments).forEach(m => m.songs.forEach(s => lookup[s.uid] = { song: s }));
 
@@ -324,16 +351,17 @@
       state.moments[id].songs = [...el.children].map(li => {
         const hit = lookup[li.dataset.uid];
         if (!hit) return null;
-        const song = hit.bank ? copySong(hit.song) : hit.song;
-        if (!hit.bank && seen.has(song.uid)) return null;
-        seen.add(song.uid);
-        return song;
+        const k = songKey(hit.song);
+        if (seen.has(k)) { rejected = true; return null; }
+        seen.add(k);
+        return hit.bank ? copySong(hit.song) : hit.song;
       }).filter(Boolean);
     });
     // Si la canción elegida salió de un momento, se limpia la marca
     Object.values(state.moments).forEach(m => {
       if (m.chosen && !m.songs.some(s => s.uid === m.chosen)) m.chosen = null;
     });
+    if (rejected) toast('Esa canción ya está en ese momento de la misa');
     save();
     setTimeout(render, 0);
   }
@@ -370,10 +398,11 @@
       const u = t.closest('.song').dataset.uid;
       const hit = findSong(u);
       const target = state.moments[t.value];
+      const name = momentName(t.value);
+      if (inMoment(t.value, hit.song)) { t.value = ''; return toast(`Ya está en “${name}”`); }
       target.songs.push(copySong(hit.song));
       if (target.hidden) target.hidden = false;
       save(); render();
-      const name = MASS.flatMap(s => s.moments).find(m => m.id === t.value).name;
       toast(`Agregada a “${name}”`);
     }
     if (t.id === 'play-mode') { state.playMode = t.value; save(); }
@@ -433,6 +462,109 @@
 
   const momentName = id => MASS.flatMap(s => s.moments).find(m => m.id === id)?.name || '';
 
+  // ---------------------------------------------------------------------------
+  // Recomendar un orden con las canciones del banco
+  // 1) Cantos litúrgicos por palabras clave (Santo, Cordero, Gloria, Ave María…)
+  // 2) Canciones reconocibles de boda (Pachelbel, Mendelssohn, Wagner…)
+  // 3) El resto se reparte en los momentos "libres" respetando el orden del banco
+  //    (que suele ser el orden de la playlist)
+  // ---------------------------------------------------------------------------
+  const RULES = [
+    { id: 'piedad', max: 2, words: ['senor ten piedad', 'senor, ten piedad', 'ten piedad', 'kyrie', 'piedad'] },
+    { id: 'gloria', max: 2, words: ['gloria a dios', 'gloria in excelsis', 'gloria'] },
+    { id: 'salmo', max: 2, words: ['salmo', 'psalm', 'el senor es mi pastor', 'mi pastor', 'dichosos'] },
+    { id: 'aleluya', max: 2, words: ['aleluya', 'alleluia', 'aclamacion al evangelio'] },
+    { id: 'fieles', max: 1, words: ['te rogamos', 'oyenos'] },
+    { id: 'ofertorio', max: 2, words: ['ofertorio', 'ofrenda', 'ofrecemos', 'te presento', 'te presentamos', 'bendito seas', 'pan y vino', 'el vino y el pan', 'acepta senor'] },
+    { id: 'santo', max: 2, words: ['santo, santo', 'santo santo', 'sanctus', 'hosanna', 'santo es el senor', 'santo'] },
+    { id: 'memorial', max: 1, words: ['anunciamos tu muerte', 'memorial'] },
+    { id: 'padrenuestro', max: 1, words: ['padre nuestro', 'padrenuestro', 'our father', 'pater noster'] },
+    { id: 'paz', max: 1, words: ['la paz', 'de paz', 'paz'] },
+    { id: 'cordero', max: 2, words: ['cordero de dios', 'agnus dei', 'cordero'] },
+    { id: 'comunion', max: 5, words: ['comunion', 'pescador de hombres', 'alma misionera', 'pan de vida', 'pan del cielo', 'cuerpo de cristo', 'vaso nuevo', 'no adoreis', 'ven a mi', 'tu palabra', 'yo soy el pan', 'panis angelicus', 'jesus', 'cristo', 'ubi caritas'] },
+    { id: 'accion-gracias', max: 2, words: ['gracias', 'magnificat', 'cuan grande es el', 'how great thou art', 'hallelujah', 'amazing grace', 'sublime gracia'] },
+    { id: 'virgen', max: 3, words: ['ave maria', 'salve regina', 'salve', 'virgen', 'maria', 'madre', 'mother mary'] },
+    { id: 'entrada-novia', max: 3, words: ['pachelbel', 'canon in d', 'canon en re', 'canon', 'bridal chorus', 'lohengrin', 'wagner', 'here comes the bride', 'jesu, joy', 'jesu joy', 'jesus alegria', 'a thousand years', 'can\'t help falling', 'perfect', 'marry me', 'wedding'] },
+    { id: 'entrada-novio', max: 1, words: ['trumpet voluntary', 'prince of denmark', 'clarke', 'queen of sheba', 'reina de saba', 'trumpet tune', 'la rejouissance'] },
+    { id: 'firma', max: 3, words: ['vivaldi', 'primavera', 'spring', 'air on the g', 'aria', 'arioso', 'mozart', 'minuet', 'minueto', 'serenata', 'claro de luna', 'clair de lune', 'bach', 'handel', 'haendel', 'violin', 'piano', 'instrumental', 'cello'] },
+    { id: 'salida', max: 2, words: ['marcha nupcial', 'wedding march', 'mendelssohn', 'oda a la alegria', 'ode to joy', 'himno a la alegria', 'beethoven', 'celebra', 'all you need is love', 'signed, sealed', 'marry you', 'happy', 'alegria'] },
+  ];
+  // Momentos que admiten cualquier canción, en el orden en que se rellenan si sobran canciones
+  const FLEXIBLE = ['entrada-novia', 'salida', 'firma', 'anillos', 'comunion', 'accion-gracias', 'entrada-novio', 'entrada-cortejo', 'arras', 'ofertorio', 'virgen'];
+  const MASS_ORDER = MASS.flatMap(sec => sec.moments.map(m => m.id));
+
+  function scoreSong(song) {
+    const text = ` ${norm(`${song.title} ${song.artist}`)} `;
+    const scores = [];
+    RULES.forEach((r, ri) => {
+      r.words.forEach((w, wi) => {
+        const re = new RegExp(`(^|[^a-z])${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z]|$)`);
+        // las frases más largas y las primeras de la lista pesan más
+        if (re.test(text)) scores.push({ id: r.id, score: w.length * 2 + (r.words.length - wi), ri });
+      });
+    });
+    // mejor coincidencia por momento
+    const best = {};
+    scores.forEach(x => { if (!best[x.id] || best[x.id].score < x.score) best[x.id] = x; });
+    return Object.values(best).sort((a, b) => b.score - a.score);
+  }
+
+  function recommend() {
+    const pool = state.bank.filter(s => s.title !== 'Cargando…');
+    const plan = {};
+    MASS_ORDER.forEach(id => { if (state.moments[id]) plan[id] = []; });
+    const maxOf = id => RULES.find(r => r.id === id)?.max ?? 1;
+    const used = new Set();
+
+    // 1 y 2: por palabras clave, primero las coincidencias más fuertes
+    const matches = [];
+    pool.forEach((song, order) => scoreSong(song).forEach((m, rank) => matches.push({ song, order, rank, ...m })));
+    matches.sort((a, b) => a.rank - b.rank || b.score - a.score || a.order - b.order);
+    matches.forEach(m => {
+      if (used.has(m.song.uid) || !plan[m.id] || plan[m.id].length >= maxOf(m.id)) return;
+      plan[m.id].push(m.song); used.add(m.song.uid);
+    });
+
+    // 3: las canciones sin coincidencia se reparten en los momentos libres vacíos,
+    //    manteniendo el orden del banco (= orden de la playlist)
+    let rest = pool.filter(s => !used.has(s.uid));
+    const empty = MASS_ORDER.filter(id => FLEXIBLE.includes(id) && plan[id] && !plan[id].length);
+    empty.forEach(id => { if (rest.length) { const s = rest.shift(); plan[id].push(s); used.add(s.uid); } });
+    // si todavía sobran, quedan como alternativas en los momentos libres
+    const extraSlots = { 'comunion': 5, 'entrada-novia': 3, 'salida': 3, 'firma': 3, 'anillos': 2, 'accion-gracias': 2 };
+    let guard = 0;
+    while (rest.length && guard++ < 50) {
+      let placed = false;
+      for (const id of Object.keys(extraSlots)) {
+        if (!rest.length) break;
+        if (plan[id].length < extraSlots[id]) { plan[id].push(rest.shift()); placed = true; }
+      }
+      if (!placed) break;
+    }
+    return { plan, leftover: rest.length };
+  }
+
+  $('#recommend').addEventListener('click', () => {
+    const ready = state.bank.filter(s => s.title !== 'Cargando…');
+    if (!ready.length) return toast('Primero agrega canciones al banco');
+    const hasPlan = Object.values(state.moments).some(m => m.songs.length);
+    if (hasPlan && !confirm('Se reemplazará el orden actual de la misa por una recomendación. Podrás deshacerlo. ¿Continuar?')) return;
+    const backup = JSON.stringify(state);
+    const { plan, leftover } = recommend();
+    let filled = 0;
+    Object.entries(plan).forEach(([id, songs]) => {
+      const m = state.moments[id];
+      m.songs = songs.map(copySong);
+      m.chosen = null;
+      if (songs.length) { m.hidden = false; filled++; }
+    });
+    save(); render();
+    massEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    toast(`Orden sugerido en ${filled} momentos${leftover ? ` · ${leftover} canciones quedaron solo en el banco` : ''}`, {
+      label: 'Deshacer', run: () => { state = normalize(JSON.parse(backup)); save(); render(); },
+    });
+  });
+
   // Menú
   $('#play-all').addEventListener('click', () => {
     const q = buildQueue();
@@ -467,10 +599,16 @@
   document.addEventListener('click', e => { if (!e.target.closest('.menu')) closeMenu(); });
 
   let toastTimer;
-  function toast(msg) {
+  function toast(msg, action) {
     const t = $('#toast');
-    t.textContent = msg; t.classList.add('show');
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+    t.textContent = msg;
+    if (action) {
+      const b = Object.assign(document.createElement('button'), { className: 'toast-action', textContent: action.label });
+      b.addEventListener('click', () => { t.classList.remove('show'); action.run(); });
+      t.append(b);
+    }
+    t.classList.add('show');
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), action ? 8000 : 3200);
   }
 
   // ---------------------------------------------------------------------------
@@ -738,6 +876,7 @@
   // ---------------------------------------------------------------------------
   (async () => {
     await spotifyAuth.handleRedirect();
+    if (dedupeBank()) save();
     renderSearch();
     render();
     // Completa metadatos que hayan quedado pendientes

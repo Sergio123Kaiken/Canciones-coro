@@ -51,7 +51,7 @@ h1 {
 }
 h1:hover, h1:focus { border-bottom-color: var(--line); }
 .subtitle { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
-.actions { display: flex; gap: 8px; align-items: center; }
+.actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 
 /* Botones ------------------------------------------------------------------- */
 .btn {
@@ -97,7 +97,7 @@ h1:hover, h1:focus { border-bottom-color: var(--line); }
   max-width: 1280px; margin: 0 auto; padding: 20px;
   display: grid; grid-template-columns: minmax(300px, 380px) 1fr; gap: 24px; align-items: start;
 }
-.bank { position: sticky; top: 92px; max-height: calc(100vh - 110px); display: flex; }
+.bank { min-width: 0; position: sticky; top: 92px; max-height: calc(100vh - 110px); display: flex; }
 body.with-player .bank { max-height: calc(100vh - 220px); }
 .panel {
   background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
@@ -260,12 +260,17 @@ kbd { font: 11px var(--sans); background: var(--paper); border: 1px solid var(--
   background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 999px;
   font-size: 13px; opacity: 0; pointer-events: none; transition: .25s; z-index: 50; max-width: calc(100% - 32px);
 }
+.toast-action {
+  margin-left: 12px; border: none; background: none; color: #f3d99b; font-weight: 600; cursor: pointer; padding: 0;
+}
+.toast.show { pointer-events: auto; }
 .toast.show { opacity: 1; transform: translate(-50%, 0); }
 body.with-player .toast { bottom: 120px; }
 
 /* Responsive ---------------------------------------------------------------- */
 @media (max-width: 860px) {
-  .layout { grid-template-columns: 1fr; padding: 16px; gap: 16px; }
+  .layout { grid-template-columns: minmax(0, 1fr); padding: 16px; gap: 16px; }
+  .top { position: static; }
   .bank { position: static; max-height: none; }
   body.with-player .bank { max-height: none; }
   .bank-list { max-height: 45vh; }
@@ -279,8 +284,11 @@ body.with-player .toast { bottom: 120px; }
 }
 @media (max-width: 480px) {
   .actions { width: 100%; }
-  .actions .btn.primary { flex: 1; }
+  .actions > .btn { flex: 1; padding: 8px 10px; }
+  .actions .menu { flex-basis: 100%; }
+  .actions .menu > .btn { display: block; text-align: center; border: none; background: none; color: var(--muted); padding: 2px; }
   .moment { padding: 12px; }
+  .meta .title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
   .moment-title h3 { font-size: 18px; }
 }
 

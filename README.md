@@ -9,9 +9,11 @@ Página para organizar las canciones de la misa de matrimonio (estructura de la 
    También puedes escribir texto libre (ej. “Ave María – coro en vivo”) para canciones que no están en Spotify.
 3. **Arrastra** las canciones del banco a cada momento de la misa (o usa el botón **＋** de cada canción, más cómodo en el celular).
    Un momento puede tener varias candidatas: marca la elegida con **☆**.
-4. **▶ Escuchar en orden** reproduce la misa completa, momento a momento. Puedes elegir si suena solo la elegida o todas las candidatas.
+   Las canciones no se repiten: ni en el banco (si pegas de nuevo la misma playlist, solo entran las nuevas) ni dentro de un mismo momento de la misa.
+4. **✨ Recomendar orden** reparte las canciones del banco en la misa: reconoce cantos litúrgicos por su nombre (Santo, Cordero de Dios, Gloria, Ave María…) y clásicos de matrimonio (Pachelbel, Mendelssohn, Vivaldi…), y el resto lo ubica en los momentos libres (entradas, anillos, comunión, firma, salida) respetando el orden de la playlist. Siempre se puede **Deshacer**.
+5. **▶ Escuchar en orden** reproduce la misa completa, momento a momento. Puedes elegir si suena solo la elegida o todas las candidatas.
    Si tienes sesión iniciada en Spotify en el navegador, las canciones suenan completas; si no, Spotify reproduce vistas previas de 30 s.
-5. **Guardar / compartir**: el plan se guarda solo en tu navegador. Para mostrárselo a tu pareja, al coro o al sacerdote usa *Copiar enlace*, descarga un respaldo `.json` o imprime el programa.
+6. **Guardar / compartir**: el plan se guarda solo en tu navegador. Para mostrárselo a tu pareja, al coro o al sacerdote usa *Copiar enlace*, descarga un respaldo `.json` o imprime el programa.
 
 ### Búsqueda dentro de la página (opcional)
 
