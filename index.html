@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Canciones de nuestra misa</title>
+  <meta name="description" content="Organiza las canciones de la misa de matrimonio con Spotify, arrastrando y soltando." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div class="top-inner">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">✝</span>
+        <div>
+          <h1 id="mass-title" contenteditable="true" spellcheck="false">Nuestra misa de matrimonio</h1>
+          <p class="subtitle">Arrastra canciones de Spotify a cada momento de la misa y escúchalas en orden.</p>
+        </div>
+      </div>
+      <nav class="actions">
+        <button class="btn primary" id="play-all">▶ Escuchar en orden</button>
+        <details class="menu">
+          <summary class="btn">Guardar / compartir ▾</summary>
+          <div class="menu-panel">
+            <button class="menu-item" id="share-link">🔗 Copiar enlace para compartir</button>
+            <button class="menu-item" id="export-json">⬇ Descargar respaldo (.json)</button>
+            <label class="menu-item file">⬆ Cargar respaldo<input type="file" id="import-json" accept="application/json,.json" hidden /></label>
+            <button class="menu-item" id="print">🖨 Imprimir programa</button>
+            <hr />
+            <button class="menu-item danger" id="reset">Reiniciar todo</button>
+          </div>
+        </details>
+      </nav>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Banco de canciones -->
+    <aside class="bank" aria-label="Banco de canciones">
+      <div class="panel">
+        <h2>Banco de canciones</h2>
+        <p class="hint">Pega uno o varios links de canciones de Spotify (Compartir → Copiar enlace). También puedes escribir el nombre de una canción que cantará el coro en vivo.</p>
+        <form id="add-form" class="add-form">
+          <textarea id="add-input" rows="2" placeholder="https://open.spotify.com/track/…"></textarea>
+          <button class="btn primary" type="submit">Agregar</button>
+        </form>
+
+        <div class="spotify-search" id="spotify-search">
+          <!-- Se rellena desde app.js según haya sesión de Spotify o no -->
+        </div>
+
+        <div class="bank-head">
+          <span id="bank-count">0 canciones</span>
+          <input type="search" id="bank-filter" placeholder="Filtrar…" />
+        </div>
+        <ul class="song-list bank-list" id="bank-list"></ul>
+        <p class="empty-bank" id="empty-bank">Aún no hay canciones. Agrega links arriba y luego arrástralas a la misa →</p>
+      </div>
+    </aside>
+
+    <!-- Estructura de la misa -->
+    <section class="mass" id="mass" aria-label="Estructura de la misa"></section>
+  </main>
+
+  <!-- Reproductor -->
+  <div class="player" id="player" hidden>
+    <div class="player-inner">
+      <div class="player-info">
+        <span class="now-label">Sonando</span>
+        <strong id="now-moment">—</strong>
+        <span id="now-pos" class="now-pos"></span>
+      </div>
+      <div class="player-embed"><div id="embed"></div></div>
+      <div class="player-controls">
+        <button class="btn icon" id="prev" title="Anterior">⏮</button>
+        <button class="btn icon" id="next" title="Siguiente">⏭</button>
+        <label class="auto"><input type="checkbox" id="autoplay" checked /> Seguir automáticamente</label>
+        <button class="btn icon" id="close-player" title="Cerrar">✕</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script src="sortable.min.js"></script>
+  <script src="app.js"></script>
+  <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
+</body>
+</html>
