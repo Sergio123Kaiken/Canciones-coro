@@ -114,6 +114,12 @@ body.with-player .bank { max-height: calc(100vh - 220px); }
 .add-form textarea:focus, input:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
 
 .spotify-search { margin-bottom: 10px; }
+.playlist-help {
+  background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; font-size: 12.5px;
+}
+.playlist-help ol { margin: 6px 0; padding-left: 18px; }
+.playlist-help p { margin: 0; color: var(--muted); }
+kbd { font: 11px var(--sans); background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 1px 4px; }
 .connect summary { cursor: pointer; font-size: 12.5px; color: var(--accent); }
 .connect ol { padding-left: 18px; font-size: 12.5px; color: var(--muted); }
 .connect code { font-size: 11px; background: var(--accent-soft); padding: 2px 5px; border-radius: 4px; word-break: break-all; color: var(--ink); }

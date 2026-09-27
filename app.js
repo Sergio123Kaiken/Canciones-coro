@@ -151,31 +151,33 @@
 
   async function addFromInput(raw) {
     const parts = raw.split(/\s+(?=https?:|spotify:)|\n+/).map(s => s.trim()).filter(Boolean);
-    let added = 0;
+    const fresh = [];
+    let dupes = 0;
+    $('#playlist-help').hidden = true;
     for (const part of parts) {
       const sp = parseSpotify(part);
       if (!sp) { // texto libre (coro en vivo, etc.)
         state.bank.push({ uid: uid(), sid: null, title: part, artist: 'Coro / en vivo', thumb: '' });
-        added++;
         continue;
       }
       if (sp.type === 'track') {
-        if (state.bank.some(s => s.sid === sp.id)) { toast('Esa canción ya está en el banco'); continue; }
+        if (state.bank.some(s => s.sid === sp.id)) { dupes++; continue; }
         const song = { uid: uid(), sid: sp.id, title: 'Cargando…', artist: '', thumb: '' };
         state.bank.push(song);
-        added++;
-        render();
-        fillMetadata([song]);
-      } else if (spotifyAuth.token()) {
+        fresh.push(song);
+      } else if (spotifyAuth.hasSession()) {
         const tracks = await spotifyAuth.listTracks(sp.type, sp.id);
-        tracks.forEach(t => { if (!state.bank.some(s => s.sid === t.sid)) { state.bank.push(t); added++; } });
-        toast(`Importadas ${tracks.length} canciones`);
+        let n = 0;
+        tracks.forEach(t => { if (!state.bank.some(s => s.sid === t.sid)) { state.bank.push(t); n++; } });
+        toast(`Importadas ${n} canciones`);
       } else {
-        toast('Para importar playlists o álbumes conecta Spotify (abajo). Por ahora pega links de canciones.');
+        $('#playlist-help').hidden = false;
       }
     }
+    if (fresh.length > 1) toast(`${fresh.length} canciones agregadas`);
+    else if (dupes && !fresh.length) toast(dupes > 1 ? 'Esas canciones ya están en el banco' : 'Esa canción ya está en el banco');
     save(); render();
-    return added;
+    if (fresh.length) fillMetadata(fresh);
   }
 
   async function fillMetadata(songs) {

@@ -42,11 +42,21 @@
     <aside class="bank" aria-label="Banco de canciones">
       <div class="panel">
         <h2>Banco de canciones</h2>
-        <p class="hint">Pega uno o varios links de canciones de Spotify (Compartir → Copiar enlace). También puedes escribir el nombre de una canción que cantará el coro en vivo.</p>
+        <p class="hint">Pega uno o varios links de canciones de Spotify (Compartir → Copiar enlace), o todas las canciones de una playlist copiadas desde Spotify. También puedes escribir el nombre de una canción que cantará el coro en vivo.</p>
         <form id="add-form" class="add-form">
           <textarea id="add-input" rows="2" placeholder="https://open.spotify.com/track/…"></textarea>
           <button class="btn primary" type="submit">Agregar</button>
         </form>
+        <div class="playlist-help" id="playlist-help" hidden>
+          <strong>Para agregar una playlist completa:</strong>
+          <ol>
+            <li>Abre la playlist en Spotify <em>en el computador</em> (app de escritorio).</li>
+            <li>Haz clic en una canción y presiona <kbd>Ctrl</kbd>+<kbd>A</kbd> (<kbd>⌘</kbd>+<kbd>A</kbd> en Mac) para seleccionarlas todas.</li>
+            <li>Copia con <kbd>Ctrl</kbd>+<kbd>C</kbd> (<kbd>⌘</kbd>+<kbd>C</kbd>) y pega aquí arriba.</li>
+          </ol>
+          <p>O conecta Spotify (abajo) y pega el link de la playlist.</p>
+          <button type="button" class="link small" onclick="this.parentElement.hidden=true">Cerrar</button>
+        </div>
 
         <div class="spotify-search" id="spotify-search">
           <!-- Se rellena desde app.js según haya sesión de Spotify o no -->
