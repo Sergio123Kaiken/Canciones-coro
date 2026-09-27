@@ -449,12 +449,15 @@
     }
     if (act === 'edit') {
       const { song } = findSong(u);
-      const title = prompt('Nombre de la canción', song.title);
-      if (title === null) return;
-      const artist = prompt('Artista / intérprete', song.artist || '');
-      song.title = title.trim() || song.title;
-      if (artist !== null) song.artist = artist.trim();
-      save(); render();
+      ask({
+        title: 'Editar canción', ok: 'Guardar',
+        fields: [{ name: 'title', label: 'Nombre de la canción', value: song.title }, { name: 'artist', label: 'Artista / intérprete', value: song.artist || '' }],
+      }).then(r => {
+        if (!r) return;
+        song.title = r.title.trim() || song.title;
+        song.artist = r.artist.trim();
+        save(); render();
+      });
     }
     if (act === 'hide') { state.moments[momentId].hidden = true; save(); render(); }
     if (act === 'unhide') { state.moments[momentId].hidden = false; save(); render(); }
@@ -544,11 +547,11 @@
     return { plan, leftover: rest.length };
   }
 
-  $('#recommend').addEventListener('click', () => {
+  $('#recommend').addEventListener('click', async () => {
     const ready = state.bank.filter(s => s.title !== 'Cargando…');
     if (!ready.length) return toast('Primero agrega canciones al banco');
     const hasPlan = Object.values(state.moments).some(m => m.songs.length);
-    if (hasPlan && !confirm('Se reemplazará el orden actual de la misa por una recomendación. Podrás deshacerlo. ¿Continuar?')) return;
+    if (hasPlan && !await ask({ title: '¿Recomendar un orden?', text: 'Se reemplazará lo que ya organizaron en la misa. Después podrás deshacerlo.', ok: 'Recomendar' })) return;
     const backup = JSON.stringify(state);
     const { plan, leftover } = recommend();
     let filled = 0;
@@ -575,7 +578,7 @@
     const data = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
     const url = `${location.origin}${location.pathname}#plan=${encodeURIComponent(data)}`;
     try { await navigator.clipboard.writeText(url); toast('Enlace copiado. Quien lo abra verá este plan.'); }
-    catch { prompt('Copia este enlace:', url); }
+    catch { ask({ title: 'Copia este enlace', fields: [{ name: 'url', label: 'Enlace para compartir', value: url, select: true }], ok: 'Listo', noCancel: true }); }
     closeMenu();
   });
   $('#export-json').addEventListener('click', () => {
@@ -591,12 +594,48 @@
     e.target.value = ''; closeMenu();
   });
   $('#print').addEventListener('click', () => { closeMenu(); window.print(); });
-  $('#reset').addEventListener('click', () => {
-    if (!confirm('¿Borrar todas las canciones y empezar de cero?')) return;
-    state = blankState(); save(); render(); closeMenu();
+  $('#reset').addEventListener('click', async () => {
+    closeMenu();
+    if (!await ask({ title: '¿Empezar de cero?', text: 'Se borrarán todas las canciones del banco y de la misa.', ok: 'Borrar todo', danger: true })) return;
+    state = blankState(); save(); render();
   });
   const closeMenu = () => $('.menu').removeAttribute('open');
   document.addEventListener('click', e => { if (!e.target.closest('.menu')) closeMenu(); });
+
+  // Diálogo propio: confirm() y prompt() no funcionan en algunos navegadores
+  // integrados en apps (abren nada y devuelven "cancelar").
+  function ask({ title, text = '', fields = [], ok = 'Aceptar', danger = false, noCancel = false }) {
+    return new Promise(resolve => {
+      const wrap = document.createElement('div');
+      wrap.className = 'dialog-backdrop';
+      wrap.innerHTML = `
+        <form class="dialog" role="dialog" aria-modal="true">
+          <h3>${esc(title)}</h3>
+          ${text ? `<p>${esc(text)}</p>` : ''}
+          ${fields.map(f => `<label>${esc(f.label)}<input name="${f.name}" value="${esc(f.value)}" /></label>`).join('')}
+          <div class="dialog-actions">
+            ${noCancel ? '' : '<button type="button" class="btn" data-cancel>Cancelar</button>'}
+            <button type="submit" class="btn primary${danger ? ' danger' : ''}">${esc(ok)}</button>
+          </div>
+        </form>`;
+      document.body.append(wrap);
+      const form = wrap.querySelector('form');
+      const close = val => { wrap.remove(); document.removeEventListener('keydown', onKey); resolve(val); };
+      const onKey = e => { if (e.key === 'Escape') close(null); };
+      document.addEventListener('keydown', onKey);
+      wrap.addEventListener('click', e => { if (e.target === wrap || e.target.hasAttribute('data-cancel')) close(null); });
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        if (!fields.length) return close(true);
+        const out = {};
+        fields.forEach(f => { out[f.name] = form.elements[f.name].value; });
+        close(out);
+      });
+      const first = form.querySelector('input') || form.querySelector('[type="submit"]');
+      first.focus();
+      if (fields.some(f => f.select)) first.select();
+    });
+  }
 
   let toastTimer;
   function toast(msg, action) {
