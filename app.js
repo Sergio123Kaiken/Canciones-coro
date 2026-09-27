@@ -77,7 +77,7 @@
     MASS.forEach(s => s.moments.forEach(m => {
       if (m.music !== false) moments[m.id] = { songs: [], chosen: null, note: '', hidden: false };
     }));
-    return { title: 'Nuestra misa de matrimonio', bank: [], moments, playMode: 'chosen' };
+    return { title: 'Nuestra misa de matrimonio', bank: [], moments, playMode: 'chosen', seeded: [] };
   }
 
   function normalize(s) {
@@ -86,6 +86,7 @@
     base.title = s.title || base.title;
     base.bank = Array.isArray(s.bank) ? s.bank.filter(Boolean) : [];
     base.playMode = s.playMode === 'all' ? 'all' : 'chosen';
+    base.seeded = Array.isArray(s.seeded) ? s.seeded.filter(x => typeof x === 'string') : [];
     Object.keys(base.moments).forEach(id => {
       const m = s.moments && s.moments[id];
       if (m) Object.assign(base.moments[id], {
@@ -139,6 +140,18 @@
     return before - state.bank.length;
   }
   const inBank = s => { const k = songKey(s), n = nameKey(s); return state.bank.some(b => songKey(b) === k || (n && nameKey(b) === n)); };
+  // Agrega al banco las canciones de nuestra playlist (playlist.js) una sola vez:
+  // las que ya estén no se duplican y las que se borren no vuelven a aparecer.
+  function seedPlaylist() {
+    let n = 0;
+    (window.PLAYLIST || []).forEach(t => {
+      if (!t.sid || state.seeded.includes(t.sid)) return;
+      state.seeded.push(t.sid);
+      const song = { uid: uid(), sid: t.sid, title: t.title, artist: t.artist || '', thumb: t.thumb || '' };
+      if (!inBank(song)) { state.bank.push(song); n++; }
+    });
+    return n;
+  }
   const inMoment = (id, s, exceptUid) => state.moments[id].songs.some(x => x.uid !== exceptUid && songKey(x) === songKey(s));
   const copySong = s => ({ ...s, uid: uid() });
 
@@ -915,7 +928,9 @@
   // ---------------------------------------------------------------------------
   (async () => {
     await spotifyAuth.handleRedirect();
-    if (dedupeBank()) save();
+    const seededNow = seedPlaylist();
+    if (dedupeBank() || seededNow) save();
+    if (seededNow) setTimeout(() => toast(`Se agregaron ${seededNow} canciones de nuestra playlist al banco`), 300);
     renderSearch();
     render();
     // Completa metadatos que hayan quedado pendientes

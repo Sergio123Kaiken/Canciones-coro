@@ -18,8 +18,7 @@ Página estática (sin build) para que Sergio y su pareja organicen las cancione
 - Link rápido: `https://raw.githack.com/Sergio123Kaiken/Canciones-coro/<commit>/index.html` (con el hash del último commit).
 - Link definitivo si se activa GitHub Pages: https://sergio123kaiken.github.io/Canciones-coro/
 
-## Pendiente
-- Precargar en el banco las canciones de la playlist del usuario:
-  https://open.spotify.com/playlist/6I1q8WZgMqa8COVe0ZXvfD
-  (requiere un entorno con acceso de red a `open.spotify.com` / `api.spotify.com`; la sesión original no lo tenía).
-  Idea: guardar la lista (id, título, artista, portada) en un archivo como `playlist.json` y agregarla al banco al cargar la página, sin duplicar las que ya estén y sin volver a agregar las que el usuario haya borrado.
+## Playlist precargada
+- `playlist.js` define `window.PLAYLIST` (sid, título, artista, portada) con las canciones de https://open.spotify.com/playlist/6I1q8WZgMqa8COVe0ZXvfD.
+- `seedPlaylist()` en `app.js` las agrega al banco al cargar; guarda en `state.seeded` los IDs ya sembrados, así no se duplican y las que el usuario borre no vuelven.
+- Para actualizarla: regenerar `playlist.js` desde `https://open.spotify.com/embed/playlist/<id>` (JSON en `__NEXT_DATA__`) + oEmbed para portadas, y subir `?v=` en `index.html`.
